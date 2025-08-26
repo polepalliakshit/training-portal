@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Training Video + Quiz</title>
+<style>
+  body { font-family: Arial; margin:0; text-align:center; background:#f9f9f9; }
+  #videoContainer { margin:20px auto; width:80%; }
+  #startTestBtn { margin-top:20px; padding:12px 24px; background:gray; color:white; border:none; border-radius:8px; cursor:not-allowed; font-size:16px; }
+  #startTestBtn.enabled { background:green; cursor:pointer; }
+  #warningBanner { display:none; position:fixed; top:0; left:0; right:0; background:#fff3cd; color:#856404; border:2px solid #ffeeba; padding:15px; font-size:18px; z-index:1000; }
+  #warningBanner button { margin-left:15px; background:#856404; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer; }
+  #terminateOverlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); color:white; font-size:24px; text-align:center; padding-top:20%; z-index:2000; }
+</style>
+</head>
+<body>
+
+<h2>Mandatory Training Video</h2>
+<div id="videoContainer">
+  <iframe id="trainingVideo"
+    src="https://drive.google.com/file/d/1tzImeYe4b-MEqfWDKpnJyHMwGsagYSxQ/preview"
+    width="800" height="450"
+    allow="autoplay"
+    allowfullscreen>
+  </iframe>
+</div>
+
+<button id="startTestBtn" disabled>Start Test</button>
+
+<div id="warningBanner">
+  <span id="warningMessage"></span>
+  <span id="warningTimer"></span>
+  <button id="closeWarning">❌ Close</button>
+</div>
+
+<div id="terminateOverlay">
+  ❌ You have been terminated from the session.<br>
+  Please reach out to your TL for further assistance.
+</div>
+
+<script>
+let switchCount = 0;
+let warningTimer;
+let countdown = 0;
+let userEmail = "";
+const sessionId = "SESSION_" + Math.random().toString(36).substr(2, 9);
+
+const startTestBtn = document.getElementById("startTestBtn");
+const warningBanner = document.getElementById("warningBanner");
+const warningMessage = document.getElementById("warningMessage");
+const warningTimerDiv = document.getElementById("warningTimer");
+const terminateOverlay = document.getElementById("terminateOverlay");
+
+// Prompt email
+window.onload = function() {
+  userEmail = prompt("Enter your email to begin:");
+  if (!userEmail) { alert("Email is required."); terminateSession("No email entered."); }
+}
+
+// Logging
+function logEvent(event, details){
+  fetch("https://script.google.com/a/macros/navi.com/s/AKfycbwtyB1_tcnQ0YVw_SpsKrE2o01rQzCDMKCfgErzsiemEF0RVQcIyzak141gp6uZRy1L/exec",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({email:userEmail,event:event,details:details,sessionId:sessionId})
+  }).catch(err=>console.error("Logging failed:", err));
+}
+
+// Tab switch detection
+document.addEventListener("visibilitychange", function() {
+  if(document.hidden){
+    switchCount++;
+    if(switchCount===1||switchCount===2){ showWarning("⚠️ You are not allowed to switch screen. Return within 15 seconds."); logEvent("Tab Switch","Attempt "+switchCount);}
+    else if(switchCount>=3){ terminateSession("You have switched tabs multiple times. Session terminated."); logEvent("Termination","Multiple tab switches"); }
+  } else {
+    if(switchCount===1||switchCount===2){ clearInterval(warningTimer); warningTimerDiv.textContent="✅ You returned in time."; logEvent("Returned","Returned after attempt "+switchCount);}
+  }
+});
+
+function showWarning(message){
+  countdown=15; warningMessage.textContent=message; warningTimerDiv.textContent=" Time left: "+countdown+"s"; warningBanner.style.display="block";
+  clearInterval(warningTimer);
+  warningTimer=setInterval(()=>{
+    countdown--;
+    if(countdown>0){ warningTimerDiv.textContent=" Time left: "+countdown+"s"; }
+    else { clearInterval(warningTimer); warningBanner.style.display="none"; terminateSession("You did not return in time."); logEvent("Termination","User did not return in time"); }
+  },1000);
+}
+
+document.getElementById("closeWarning").addEventListener("click",()=>{ warningBanner.style.display="none"; });
+
+function terminateSession(message){
+  terminateOverlay.innerHTML=message; terminateOverlay.style.display="block"; startTestBtn.disabled=true; startTestBtn.classList.remove("enabled"); logEvent("Termination",message);
+}
+
+// Unlock Start Test button after simulated video duration
+document.getElementById("trainingVideo").addEventListener("load", ()=>{
+  setTimeout(()=>{
+    startTestBtn.disabled=false;
+    startTestBtn.classList.add("enabled");
+    startTestBtn.onclick=()=>{
+      window.open("https://forms.gle/i4WaH4jRCooJzAsXA","_blank"); 
+      logEvent("Test Started","User clicked Start Test");
+    };
+  },1000*60*5); // adjust 5 min to video duration
+});
+</script>
+</body>
+</html>
